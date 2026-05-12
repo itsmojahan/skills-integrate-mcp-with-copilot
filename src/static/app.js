@@ -3,9 +3,41 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const loginModal = document.getElementById("login-modal");
+  const loginForm = document.getElementById("login-form");
+  const loginMessage = document.getElementById("login-message");
+  // Function to check auth status
+  async function checkAuthStatus() {
+    try {
+      const response = await fetch("/auth/status");
+      const data = await response.json();
+      return data.logged_in;
+    } catch (error) {
+      console.error("Error checking auth status:", error);
+      return false;
+    }
+  }
 
+  // Function to update auth UI
+  function updateAuthUI(loggedIn) {
+    if (loggedIn) {
+      loginBtn.classList.add("hidden");
+      logoutBtn.classList.remove("hidden");
+      signupForm.style.display = "block";
+      document.querySelectorAll(".delete-btn").forEach(btn => btn.style.display = "inline");
+    } else {
+      loginBtn.classList.remove("hidden");
+      logoutBtn.classList.add("hidden");
+      signupForm.style.display = "none";
+      document.querySelectorAll(".delete-btn").forEach(btn => btn.style.display = "none");
+    }
+  }
   // Function to fetch activities from API
   async function fetchActivities() {
+    const loggedIn = await checkAuthStatus();  // Check auth status before loading activities
+
     try {
       const response = await fetch("/activities");
       const activities = await response.json();
@@ -60,6 +92,9 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll(".delete-btn").forEach((button) => {
         button.addEventListener("click", handleUnregister);
       });
+
+      // Update UI based on auth status
+      updateAuthUI(loggedIn);
     } catch (error) {
       activitiesList.innerHTML =
         "<p>Failed to load activities. Please try again later.</p>";
@@ -152,6 +187,66 @@ document.addEventListener("DOMContentLoaded", () => {
       messageDiv.className = "error";
       messageDiv.classList.remove("hidden");
       console.error("Error signing up:", error);
+    }
+  });
+
+  // Login button event
+  loginBtn.addEventListener("click", () => {
+    loginModal.classList.remove("hidden");
+  });
+
+  // Close modal
+  closeModal.addEventListener("click", () => {
+    loginModal.classList.add("hidden");
+  });
+
+  // Login form submission
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    try {
+      const response = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ username, password })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        loginMessage.textContent = result.message;
+        loginMessage.className = "success";
+        loginModal.classList.add("hidden");
+        loginForm.reset();
+        fetchActivities();  // Refresh to show admin controls
+      } else {
+        loginMessage.textContent = result.detail || "Login failed";
+        loginMessage.className = "error";
+      }
+
+      loginMessage.classList.remove("hidden");
+      setTimeout(() => loginMessage.classList.add("hidden"), 5000);
+    } catch (error) {
+      loginMessage.textContent = "Login failed. Please try again.";
+      loginMessage.className = "error";
+      loginMessage.classList.remove("hidden");
+      console.error("Error logging in:", error);
+    }
+  });
+
+  // Logout button event
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      const response = await fetch("/logout", { method: "POST" });
+      const result = await response.json();
+      if (response.ok) {
+        fetchActivities();  // Refresh to hide admin controls
+      }
+    } catch (error) {
+      console.error("Error logging out:", error);
     }
   });
 
